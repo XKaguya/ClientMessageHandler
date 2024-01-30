@@ -1,0 +1,10 @@
+﻿<Window x:Class="ClientMessageHandler.LogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LogWindow" Height="340" Width="824">
+    <Border Background="#FFF" CornerRadius="10">
+        <Grid>
+            <RichTextBox x:Name="LogRichTextBox" VerticalScrollBarVisibility="Auto" IsReadOnly="True" Background="White"/>
+        </Grid>
+    </Border>
+</Window>

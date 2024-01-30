@@ -1,0 +1,14 @@
+﻿<Window x:Class="ClientMessageHandler.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ClientMessageHandler"
+        mc:Ignorable="d"
+        Title="ClientMessageHandler" Height="350" Width="525">
+    <Grid>
+        <Button Margin="-300,0,10,10" Content="Log" Width="100" Height="30" Click="LogButtonHandler"/>
+        <Button Margin="0,0,10,10" Content="File" Width="100" Height="30" Click="FileButtonHandler"/>
+        <!--<Button Margin="300,0,10,10" Content="Data" Width="100" Height="30" Click="DataButtonHandler"/>-->
+    </Grid>
+</Window>
