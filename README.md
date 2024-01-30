@@ -1,5 +1,5 @@
 # ClientMessageHandler
-A tool use to transform Star Trek Online's message file into human readable format.
+A tool use to transform specfic game's message file into human readable format.
 
 ![DataWindow](https://github.com/XKaguya/ClientMessageHandler/blob/main/DataWindow.png)
 
