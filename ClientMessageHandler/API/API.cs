@@ -10,12 +10,10 @@ namespace ClientMessageHandler.API
 {
     public static class API
     {
-        public static List<MessageEntry> Messages { get; set; } = new List<MessageEntry>();
+        public static Dictionary<string, List<MessageEntry>> FileMessagesDict { get; set; } = new Dictionary<string, List<MessageEntry>>();
 
-        public static List<MessageEntry> Serialize(string xmlString)
+        public static void Serialize(string xmlString)
         {
-            List<MessageEntry> messages = new List<MessageEntry>();
-
             try
             {
                 using (StringReader stringReader = new StringReader(xmlString))
@@ -27,20 +25,25 @@ namespace ClientMessageHandler.API
                     XmlNamespaceManager nsmgr = new XmlNamespaceManager(navigator.NameTable);
                     nsmgr.AddNamespace("ns", "http://datacontract.gib.me/startrekonline");
 
-                    int messagesCount = navigator.Select("//ns:Message", nsmgr).Count;
-
-                    messages = new List<MessageEntry>(messagesCount);
-
                     foreach (XPathNavigator messageElement in navigator.Select("//ns:Message", nsmgr))
                     {
-                        MessageEntry entry = new MessageEntry
-                        {
-                            MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
-                            FileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value,
-                            DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value
-                        };
+                        string fileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value;
 
-                        messages.Add(entry);
+                        if (!string.IsNullOrEmpty(fileName))
+                        {
+                            if (!FileMessagesDict.ContainsKey(fileName))
+                            {
+                                FileMessagesDict[fileName] = new List<MessageEntry>();
+                            }
+                            
+                            MessageEntry entry = new MessageEntry
+                            {
+                                MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
+                                DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value ?? messageElement.SelectSingleNode("ns:Defaultstring", nsmgr)?.Value
+                            };
+                            
+                            FileMessagesDict[fileName].Add(entry);
+                        }
                     }
                 }
             }
@@ -49,12 +52,10 @@ namespace ClientMessageHandler.API
                 Logger.Error($"Error parsing XML: {ex.Message}");
             }
 
-            if (messages.Count == 0)
+            if (FileMessagesDict.Count == 0)
             {
                 Logger.Error($"No messages found in the XML.");
             }
-
-            return messages;
         }
 
         public static string LoadXmlFile()
@@ -69,28 +70,24 @@ namespace ClientMessageHandler.API
             {
                 DateTime load = DateTime.Now;
                 string filePath = openFileDialog.FileName;
-                Messages = LoadXmlFromFile(filePath);
+
+                try
+                {
+                    string xmlString = File.ReadAllText(filePath);
+                    Serialize(xmlString);
+                }
+                catch (IOException ex)
+                {
+                    Logger.Error($"{nameof(IOException)}: {ex.Message}");
+                }
+
                 DateTime loaded = DateTime.Now;
-                Logger.Log($"LoadXmlFromFile method takes {loaded - load} second.");
+                Logger.Log($"LoadXmlFromFile method takes {loaded - load} second. Loaded {FileMessagesDict.Count} items.");
 
                 return filePath;
             }
 
             return null;
-        }
-
-        private static List<MessageEntry> LoadXmlFromFile(string filePath)
-        {
-            try
-            {
-                string xmlString = File.ReadAllText(filePath);
-                return Serialize(xmlString);
-            }
-            catch (IOException ex)
-            {
-                Logger.Error($"{nameof(IOException)}: {ex.Message}");
-                return new List<MessageEntry>();
-            }
         }
     }
 }

@@ -8,10 +8,8 @@ namespace ClientMessageHandler
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow
-    {
+    {   
         static LogWindow logWindow = LogWindow.Instance;
-        
-        static DataWindow dataWindow = DataWindow.Instance;
         
         public MainWindow()
         {
@@ -40,22 +38,21 @@ namespace ClientMessageHandler
         
         private void DataButtonHandler(object sender, RoutedEventArgs ev)
         {
-            if (dataWindow.IsVisible)
+            if (DataWindow.Instance.IsVisible)
             {
-                dataWindow.Hide();
+                DataWindow.Instance.Hide();
             }
             else
             {
-                dataWindow.Show();
+                DataWindow.Instance.Show();
             }
         }
         
-        private void FileButtonHandler(object sender, RoutedEventArgs ev)
+        private async void FileButtonHandler(object sender, RoutedEventArgs ev)
         {
             API.API.LoadXmlFile();
-            
-            dataWindow.SetData(API.API.Messages);
-            dataWindow.Show();
+
+            await DataWindow.Instance.PopulateFileListAsync();
         }
     }
 }
