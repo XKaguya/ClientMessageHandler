@@ -1,112 +1,162 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using ClientMessageHandler.API;
-using ClientMessageHandler.Entry;
+using TextBox = HandyControl.Controls.TextBox;
+using Window = System.Windows.Window;
 
-namespace ClientMessageHandler;
-
-public partial class DataWindow : Window
+namespace ClientMessageHandler
 {
-    private static DataWindow instance;
-
-    private ObservableCollection<MessageEntry> dataItems;
-
-    private List<MessageEntry> originalDataItems;
-
-    public static DataWindow Instance
+    public partial class DataWindow : Window
     {
-        get
+        private static DataWindow instance;
+        
+        private ObservableCollection<string> fileListItems { get; set; }
+        
+        private List<string> allFileNames;
+        
+        private int batchSize = 500;
+
+        public static DataWindow Instance
         {
-            if (instance == null)
+            get
             {
-                instance = new DataWindow();
-                instance.InitializeComponent();
-                instance.searchTextBox.TextChanged += instance.SearchHandler;
+                if (instance == null)
+                {
+                    instance = new DataWindow();
+                }
 
-                instance.InitMethod();
-            }
-
-            return instance;
-        }
-    }
-
-    private void InitMethod()
-    {
-        dataItems = new ObservableCollection<MessageEntry>();
-        originalDataItems = new List<MessageEntry>();
-        listView.ItemsSource = dataItems;
-    }
-
-    private void ListView_Drop(object sender, DragEventArgs ev)
-    {
-        if (ev.Data.GetDataPresent(typeof(MessageEntry)))
-        {
-            MessageEntry droppedData = ev.Data.GetData(typeof(MessageEntry)) as MessageEntry;
-            if (droppedData != null)
-            {
-                dataItems.Add(droppedData);
+                return instance;
             }
         }
-    }
-
-    public void SetData(List<MessageEntry> msg)
-    {
-        Logger.Log($"Received {msg.Count} items in SetData method.");
-
-        originalDataItems.Clear();
-        originalDataItems.AddRange(msg);
-
-        RestoreData();
-    }
-
-    private void SearchHandler(object sender, TextChangedEventArgs e)
-    {
-        string searchText = searchTextBox.Text;
-
-        if (!string.Equals(searchText, "Search...", StringComparison.OrdinalIgnoreCase))
+        
+        public DataWindow()
         {
-            List<MessageEntry> filteredList = originalDataItems
-                .Where(entry =>
-                    entry.FileName.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    entry.MessageKey.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    entry.DefaultString.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
-                .ToList();
-
-            UpdateListView(filteredList);
+            InitializeComponent();
+            fileListItems = new ObservableCollection<string>();
+            fileList.ItemsSource = fileListItems;
         }
-        else
+        
+        public async Task PopulateFileListAsync()
         {
-            RestoreData();
+            ProgressWindow.Instance.Show();
+            
+            DateTime startLoad = DateTime.Now;
+
+            if (API.API.FileMessagesDict != null)
+            {
+                allFileNames = API.API.FileMessagesDict.Keys.ToList();
+                
+                ProgressWindow.Instance.progressBar.Maximum = allFileNames.Count;
+                await LoadNextBatchAsync(ProgressWindow.Instance);
+                
+                Show();
+                
+                DateTime finishLoad = DateTime.Now;
+                
+                Logger.Log($"Load {allFileNames.Count} items takes {finishLoad - startLoad} seconds.");
+            }
+            else
+            {
+                Logger.Error("API.API.FileMessagesDict is null.");
+            }
         }
-    }
-
-    private void RestoreData()
-    {
-        if (dataItems != null)
+        
+        private async Task LoadNextBatchAsync(ProgressWindow progressWindow)
         {
-            dataItems.Clear();
-            dataItems.AddRange(originalDataItems);
+            int startIndex = fileListItems.Count;
+            int endIndex = startIndex + batchSize;
+            if (endIndex > allFileNames.Count)
+            {
+                endIndex = allFileNames.Count;
+            }
+
+            for (int i = startIndex; i < endIndex; i++)
+            {
+                fileListItems.Add(allFileNames[i]);
+                progressWindow.UpdateProgress(i + 1);
+            }
+
+            if (endIndex < allFileNames.Count)
+            {
+                await Task.Delay(50);
+                await LoadNextBatchAsync(progressWindow);
+            }
+            else
+            {
+                progressWindow.Close();
+            }
         }
-    }
-
-    private void UpdateListView(List<MessageEntry> itemList)
-    {
-        dataItems.Clear();
-        dataItems.AddRange(itemList);
-    }
-}
-
-public static class ObservableCollectionExtensions
-{
-    public static void AddRange<T>(this ObservableCollection<T> collection, IEnumerable<T> items)
-    {
-        foreach (var item in items)
+        
+        protected override void OnClosing(CancelEventArgs ev)
         {
-            collection.Add(item);
+            ev.Cancel = true;
+            this.Hide();
+        }
+        
+        private void FileList_SelectionChanged(object sender, RoutedEventArgs e)
+        {
+            messagePanel.Children.Clear();
+
+            string selectedFile = fileList.SelectedItem as string;
+            if (selectedFile != null && API.API.FileMessagesDict.ContainsKey(selectedFile))
+            {
+                var messages = API.API.FileMessagesDict[selectedFile];
+                foreach (var message in messages)
+                {
+                    var messageTextBox = new TextBox
+                    {
+                        Text = $"MessageKey: {message.MessageKey}",
+                        IsReadOnly = true,
+                        BorderThickness = new Thickness(0),
+                        Margin = new Thickness(0, 0, 0, 5),
+                        FontWeight = FontWeights.Bold,
+                        Background = Brushes.Transparent,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 15,
+                    };
+
+                    var defaultStringTextBox = new TextBox
+                    {
+                        Text = $"DefaultString: {message.DefaultString}",
+                        IsReadOnly = true,
+                        BorderThickness = new Thickness(0),
+                        Background = Brushes.Transparent,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 15,
+                    };
+
+                    messagePanel.Children.Add(messageTextBox);
+                    messagePanel.Children.Add(defaultStringTextBox);
+                }
+            }
+        }
+        
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!string.Equals(searchTextBox.Text, "Search...", StringComparison.OrdinalIgnoreCase))
+            {
+                string searchText = searchTextBox.Text.ToLower();
+            
+                var filteredFiles = allFileNames.Where(fileName => fileName.ToLower().Contains(searchText)).ToList();
+            
+                UpdateFileList(filteredFiles);
+            }
+        }
+
+        private void UpdateFileList(List<string> files)
+        {
+            fileListItems.Clear();
+            foreach (var file in files)
+            {
+                fileListItems.Add(file);
+            }
         }
     }
 }

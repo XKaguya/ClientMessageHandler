@@ -1,56 +1,43 @@
-﻿using System.ComponentModel;
+﻿using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace ClientMessageHandler.Entry
 {
     public class MessageEntry : INotifyPropertyChanged
     {
-        private string _fileName;
-        public string FileName
+        private string? _messageKey;
+        public string? MessageKey
         {
-            get { return _fileName; }
-            set
-            {
-                if (_fileName != value)
-                {
-                    _fileName = value;
-                    OnPropertyChanged(nameof(FileName));
-                }
-            }
+            get => _messageKey;
+            set => SetProperty(ref _messageKey, value);
         }
 
-        private string _messageKey;
-        public string MessageKey
+        private string? _defaultString;
+        public string? DefaultString
         {
-            get { return _messageKey; }
-            set
-            {
-                if (_messageKey != value)
-                {
-                    _messageKey = value;
-                    OnPropertyChanged(nameof(MessageKey));
-                }
-            }
+            get => _defaultString;
+            set => SetProperty(ref _defaultString, value);
         }
 
-        private string _defaultString;
-        public string DefaultString
-        {
-            get { return _defaultString; }
-            set
-            {
-                if (_defaultString != value)
-                {
-                    _defaultString = value;
-                    OnPropertyChanged(nameof(DefaultString));
-                }
-            }
-        }
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
+        protected virtual void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return false;
+
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+        
+        public override string ToString()
+        {
+            return $"MessageKey: {MessageKey}, DefaultString: {DefaultString}";
         }
     }
 }
