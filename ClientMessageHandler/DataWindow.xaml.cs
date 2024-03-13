@@ -64,7 +64,7 @@ namespace ClientMessageHandler
             }
             else
             {
-                Logger.Error("API.API.FileMessagesDict is null.");
+                Logger.Error("ERROR! FileMessageDict is null or empty !");
             }
         }
         
@@ -104,10 +104,8 @@ namespace ClientMessageHandler
         {
             messagePanel.Children.Clear();
 
-            string selectedFile = fileList.SelectedItem as string;
-            if (selectedFile != null && API.API.FileMessagesDict.ContainsKey(selectedFile))
+            if (fileList.SelectedItem is string selectedFile && API.API.FileMessagesDict.TryGetValue(selectedFile, out var messages))
             {
-                var messages = API.API.FileMessagesDict[selectedFile];
                 foreach (var message in messages)
                 {
                     var messageTextBox = new TextBox
@@ -143,9 +141,10 @@ namespace ClientMessageHandler
             if (!string.Equals(searchTextBox.Text, "Search...", StringComparison.OrdinalIgnoreCase))
             {
                 string searchText = searchTextBox.Text.ToLower();
-            
+        
                 var filteredFiles = allFileNames.Where(fileName => fileName.ToLower().Contains(searchText)).ToList();
-            
+                filteredFiles.AddRange(allFileNames.Where(fileName => API.API.FileMessagesDict[fileName].Any(message => message.MessageKey.ToLower().Contains(searchText) || message.DefaultString.ToLower().Contains(searchText))));
+        
                 UpdateFileList(filteredFiles);
             }
         }
