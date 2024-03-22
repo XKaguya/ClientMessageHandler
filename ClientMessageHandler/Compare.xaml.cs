@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel;
 using System.Windows;
 using ClientMessageHandler.API;
 
@@ -26,6 +27,12 @@ public partial class Compare : Window
     public Compare()
     {
         InitializeComponent();
+    }
+    
+    protected override void OnClosing(CancelEventArgs ev)
+    {
+        ev.Cancel = true;
+        this.Hide();
     }
     
     private void SelectFile1(object sender, RoutedEventArgs e)
@@ -74,5 +81,7 @@ public partial class Compare : Window
         await API.API.GetDifferenceAsync(filePaths);
 
         await DataWindow.Instance.PopulateFileListAsync();
+        
+        filePaths.Clear();
     }
 }
