@@ -36,15 +36,15 @@ namespace ClientMessageHandler
             Application.Current.Shutdown();
         }
         
-        private void DataButtonHandler(object sender, RoutedEventArgs ev)
+        private void CompareHandler(object sender, RoutedEventArgs ev)
         {
-            if (DataWindow.Instance.IsVisible)
+            if (Compare.Instance.IsVisible)
             {
-                DataWindow.Instance.Hide();
+                Compare.Instance.Hide();
             }
             else
             {
-                DataWindow.Instance.Show();
+                Compare.Instance.Show();
             }
         }
         
