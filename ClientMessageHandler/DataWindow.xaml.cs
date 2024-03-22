@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using ClientMessageHandler.API;
+using ClientMessageHandler.Entry;
 using TextBox = HandyControl.Controls.TextBox;
 using Window = System.Windows.Window;
 
@@ -42,7 +43,7 @@ namespace ClientMessageHandler
             fileListItems = new ObservableCollection<string>();
             fileList.ItemsSource = fileListItems;
         }
-        
+
         public async Task PopulateFileListAsync()
         {
             ProgressWindow.Instance.Show();
@@ -67,7 +68,7 @@ namespace ClientMessageHandler
                 Logger.Error("ERROR! FileMessageDict is null or empty !");
             }
         }
-        
+
         private async Task LoadNextBatchAsync(ProgressWindow progressWindow)
         {
             int startIndex = fileListItems.Count;
@@ -90,7 +91,7 @@ namespace ClientMessageHandler
             }
             else
             {
-                progressWindow.Close();
+                progressWindow.Hide();
             }
         }
         

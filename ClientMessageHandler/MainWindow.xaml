@@ -9,6 +9,6 @@
     <Grid>
         <Button Margin="-300,0,10,10" Content="Log" Width="100" Height="30" Click="LogButtonHandler"/>
         <Button Margin="0,0,10,10" Content="File" Width="100" Height="30" Click="FileButtonHandler"/>
-        <!--<Button Margin="300,0,10,10" Content="Data" Width="100" Height="30" Click="DataButtonHandler"/>-->
+        <Button Margin="300,0,10,10" Content="Compare" Width="100" Height="30" Click="CompareHandler"/>
     </Grid>
 </Window>
