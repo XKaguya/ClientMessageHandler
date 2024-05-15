@@ -8,7 +8,7 @@ using System.Xml.XPath;
 using ClientMessageHandler.Entry;
 using Microsoft.Win32;
 
-namespace ClientMessageHandler.API
+namespace ClientMessageHandler.Generic
 {
     public static class API
     {
@@ -18,35 +18,14 @@ namespace ClientMessageHandler.API
         {
             try
             {
-                using (StringReader stringReader = new StringReader(xmlString))
-                using (XmlReader reader = XmlReader.Create(stringReader))
+                var messages = DeserializeXml(xmlString);
+                foreach (var kvp in messages)
                 {
-                    XPathDocument xPathDoc = new XPathDocument(reader);
-                    XPathNavigator navigator = xPathDoc.CreateNavigator();
-
-                    XmlNamespaceManager nsmgr = new XmlNamespaceManager(navigator.NameTable);
-                    nsmgr.AddNamespace("ns", "http://datacontract.gib.me/startrekonline");
-
-                    foreach (XPathNavigator messageElement in navigator.Select("//ns:Message", nsmgr))
+                    if (!FileMessagesDict.ContainsKey(kvp.Key))
                     {
-                        string fileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value;
-
-                        if (!string.IsNullOrEmpty(fileName))
-                        {
-                            if (!FileMessagesDict.ContainsKey(fileName))
-                            {
-                                FileMessagesDict[fileName] = new List<MessageEntry>();
-                            }
-                            
-                            MessageEntry entry = new MessageEntry
-                            {
-                                MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
-                                DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value ?? messageElement.SelectSingleNode("ns:Defaultstring", nsmgr)?.Value
-                            };
-                            
-                            FileMessagesDict[fileName].Add(entry);
-                        }
+                        FileMessagesDict[kvp.Key] = new List<MessageEntry>();
                     }
+                    FileMessagesDict[kvp.Key].AddRange(kvp.Value);
                 }
             }
             catch (XmlException ex)
@@ -56,106 +35,65 @@ namespace ClientMessageHandler.API
 
             if (FileMessagesDict.Count == 0)
             {
-                Logger.Error($"No messages found in the XML.");
+                Logger.Error("No messages found in the XML.");
             }
         }
-        
-        private static async Task SerializeAsync(string xmlString)
+
+        private static Dictionary<string, List<MessageEntry>> DeserializeXml(string xmlString)
+        {
+            var messages = new Dictionary<string, List<MessageEntry>>();
+
+            using (StringReader stringReader = new StringReader(xmlString))
+            using (XmlReader reader = XmlReader.Create(stringReader))
+            {
+                XPathDocument xPathDoc = new XPathDocument(reader);
+                XPathNavigator navigator = xPathDoc.CreateNavigator();
+
+                XmlNamespaceManager nsmgr = new XmlNamespaceManager(navigator.NameTable);
+                nsmgr.AddNamespace("ns", "http://datacontract.gib.me/startrekonline");
+
+                foreach (XPathNavigator messageElement in navigator.Select("//ns:Message", nsmgr))
+                {
+                    string fileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value;
+
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        if (!messages.ContainsKey(fileName))
+                        {
+                            messages[fileName] = new List<MessageEntry>();
+                        }
+
+                        MessageEntry entry = new MessageEntry
+                        {
+                            MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
+                            DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value ?? messageElement.SelectSingleNode("ns:Defaultstring", nsmgr)?.Value
+                        };
+
+                        messages[fileName].Add(entry);
+                    }
+                }
+            }
+
+            return messages;
+        }
+
+        private static async Task<Dictionary<string, List<MessageEntry>>> DeserializeXmlAsync(string xmlString)
+        {
+            return await Task.Run(() => DeserializeXml(xmlString)).ConfigureAwait(false);
+        }
+
+        public static async Task<Dictionary<string, List<MessageEntry>>> SerializeAsync(string xmlString, bool ifReturn = false)
         {
             try
             {
-                using (StringReader stringReader = new StringReader(xmlString))
-                using (XmlReader reader = XmlReader.Create(stringReader))
-                {
-                    XPathDocument xPathDoc = new XPathDocument(reader);
-                    XPathNavigator navigator = xPathDoc.CreateNavigator();
-
-                    XmlNamespaceManager nsmgr = new XmlNamespaceManager(navigator.NameTable);
-                    nsmgr.AddNamespace("ns", "http://datacontract.gib.me/startrekonline");
-
-                    foreach (XPathNavigator messageElement in navigator.Select("//ns:Message", nsmgr))
-                    {
-                        string fileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value;
-
-                        if (!string.IsNullOrEmpty(fileName))
-                        {
-                            if (!FileMessagesDict.ContainsKey(fileName))
-                            {
-                                FileMessagesDict[fileName] = new List<MessageEntry>();
-                            }
-                    
-                            MessageEntry entry = new MessageEntry
-                            {
-                                MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
-                                DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value ?? messageElement.SelectSingleNode("ns:Defaultstring", nsmgr)?.Value
-                            };
-                    
-                            FileMessagesDict[fileName].Add(entry);
-                        }
-                    }
-                }
+                var messages = await DeserializeXmlAsync(xmlString).ConfigureAwait(false);
+                return messages;
             }
             catch (XmlException ex)
             {
                 Logger.Error($"Error parsing XML: {ex.Message}");
+                return new Dictionary<string, List<MessageEntry>>();
             }
-
-            if (FileMessagesDict.Count == 0)
-            {
-                Logger.Error($"No messages found in the XML.");
-            }
-        }
-        
-        private static async Task<Dictionary<string, List<MessageEntry>>> SerializeAsync(string xmlString, bool ifReturn)
-        {
-            try
-            {
-                Dictionary<string, List<MessageEntry>> tempDictionary = new();
-                
-                using (StringReader stringReader = new StringReader(xmlString))
-                using (XmlReader reader = XmlReader.Create(stringReader))
-                {
-                    XPathDocument xPathDoc = new XPathDocument(reader);
-                    XPathNavigator navigator = xPathDoc.CreateNavigator();
-
-                    XmlNamespaceManager nsmgr = new XmlNamespaceManager(navigator.NameTable);
-                    nsmgr.AddNamespace("ns", "http://datacontract.gib.me/startrekonline");
-
-                    foreach (XPathNavigator messageElement in navigator.Select("//ns:Message", nsmgr))
-                    {
-                        string fileName = messageElement.SelectSingleNode("ns:FileName", nsmgr)?.Value;
-
-                        if (!string.IsNullOrEmpty(fileName))
-                        {
-                            if (!tempDictionary.ContainsKey(fileName))
-                            {
-                                tempDictionary[fileName] = new List<MessageEntry>();
-                            }
-                    
-                            MessageEntry entry = new MessageEntry
-                            {
-                                MessageKey = messageElement.SelectSingleNode("ns:MessageKey", nsmgr)?.Value,
-                                DefaultString = messageElement.SelectSingleNode("ns:DefaultString", nsmgr)?.Value ?? messageElement.SelectSingleNode("ns:Defaultstring", nsmgr)?.Value
-                            };
-                    
-                            tempDictionary[fileName].Add(entry);
-                        }
-                    }
-                }
-
-                return tempDictionary;
-            }
-            catch (XmlException ex)
-            {
-                Logger.Error($"Error parsing XML: {ex.Message}");
-            }
-
-            if (FileMessagesDict.Count == 0)
-            {
-                Logger.Error($"No messages found in the XML.");
-            }
-
-            return null;
         }
 
         public static string? LoadXmlFile()
@@ -190,8 +128,6 @@ namespace ClientMessageHandler.API
             return null;
         }
 
-        // Compare method should not use the LoadXmlFile method. It should use a method that only returns a file path one.
-        // Which is LoadXmlFileAlter()
         public static string? LoadXmlFileAlter()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -207,38 +143,22 @@ namespace ClientMessageHandler.API
 
             return null;
         }
-        
+
         public static async Task GetDifferenceAsync(List<string> filePaths)
         {
-            Dictionary<string, List<MessageEntry>> tempDictionary0 = new();
-            Dictionary<string, List<MessageEntry>> tempDictionary1 = new();
-            Dictionary<string, List<MessageEntry>> tempDictionary2 = new();
-            
+            var tempDictionaries = new List<Dictionary<string, List<MessageEntry>>>();
+
             Logger.Log($"Selected {filePaths.Count} to compare.");
 
             DateTime load = DateTime.Now;
-
-            Dictionary<string, string> files = new();
 
             foreach (string file in filePaths)
             {
                 try
                 {
-                    string fileContent = await File.ReadAllTextAsync(file);
-                    files[file] = fileContent;
-
-                    if (tempDictionary0.Count == 0)
-                    {
-                        tempDictionary0 = await SerializeAsync(files[file], true);
-                    }
-                    else if (tempDictionary1.Count == 0)
-                    {
-                        tempDictionary1 = await SerializeAsync(files[file], true);
-                    }
-                    else if (filePaths.Count == 3 && tempDictionary2.Count == 0)
-                    {
-                        tempDictionary2 = await SerializeAsync(files[file], true);
-                    }
+                    string fileContent = await File.ReadAllTextAsync(file).ConfigureAwait(false);
+                    var tempDict = await SerializeAsync(fileContent, true).ConfigureAwait(false);
+                    tempDictionaries.Add(tempDict);
                 }
                 catch (IOException ex)
                 {
@@ -251,62 +171,85 @@ namespace ClientMessageHandler.API
             }
 
             DateTime loaded = DateTime.Now;
-            Logger.Log($"GetDifference method takes {loaded - load} second to load {files.Count} files.");
+            Logger.Log($"GetDifference method takes {loaded - load} second to load {filePaths.Count} files.");
             Logger.Log("Now proceeding difference part.");
 
-            var differentKeys = await GetDifferentKeysAsync(tempDictionary0, tempDictionary1, tempDictionary2);
-            
-            FileMessagesDict.Clear();
+            var differentKeys = await GetDifferentKeysAsync(tempDictionaries).ConfigureAwait(false);
+
             FileMessagesDict = differentKeys;
 
-            if (differentKeys == FileMessagesDict)
-            {
-                Logger.Log($"Size: {differentKeys.Count}");
-            }
+            Logger.Log($"Size: {differentKeys.Count}");
         }
-        
+
         private static async Task<Dictionary<string, List<MessageEntry>>> GetDifferentKeysAsync(
-            Dictionary<string, List<MessageEntry>> dict0,
-            Dictionary<string, List<MessageEntry>> dict1,
-            Dictionary<string, List<MessageEntry>> dict2)
+            List<Dictionary<string, List<MessageEntry>>> dictionaries)
         {
             var resultDict = new Dictionary<string, List<MessageEntry>>();
+            var allKeys = dictionaries.SelectMany(dict => dict.Keys).Distinct().ToList();
 
-            var allKeys = dict0.Keys.Union(dict1.Keys);
-            if (dict2 != null)
-                allKeys = allKeys.Union(dict2.Keys);
+            var keyToEntriesMap = new Dictionary<string, List<(int index, MessageEntry entry)>>();
+
+            for (int i = 0; i < dictionaries.Count; i++)
+            {
+                foreach (var kvp in dictionaries[i])
+                {
+                    if (!keyToEntriesMap.ContainsKey(kvp.Key))
+                    {
+                        keyToEntriesMap[kvp.Key] = new List<(int index, MessageEntry entry)>();
+                    }
+                    keyToEntriesMap[kvp.Key].AddRange(kvp.Value.Select(entry => (i, entry)));
+                }
+            }
 
             foreach (var key in allKeys)
             {
-                var entryList0 = dict0.ContainsKey(key) ? dict0[key] : new List<MessageEntry>();
-                var entryList1 = dict1.ContainsKey(key) ? dict1[key] : new List<MessageEntry>();
-                var entryList2 = dict2 != null && dict2.ContainsKey(key) ? dict2[key] : new List<MessageEntry>();
-
-                var allEntries = entryList0.Union(entryList1).Union(entryList2);
-
+                var entryGroups = keyToEntriesMap.ContainsKey(key) ? keyToEntriesMap[key] : new List<(int index, MessageEntry entry)>();
+                var groupedEntries = entryGroups.GroupBy(e => e.entry.DefaultString).ToList();
+                
                 var differentEntries = await Task.Run(() =>
-                    allEntries.GroupBy(entry => entry.DefaultString)
-                        .Where(group => group.Count() == 1)
-                        .SelectMany(group => group)
-                        .ToList());
+                    groupedEntries
+                        .Where(g => g.Count() == 1)
+                        .SelectMany(g => g)
+                        .ToList()).ConfigureAwait(false);
 
                 if (differentEntries.Any())
                 {
-                    foreach (var entry in differentEntries)
+                    foreach (var entryGroup in differentEntries)
                     {
-                        if ((dict0.ContainsKey(key) && !dict1.ContainsKey(key) && !dict2.ContainsKey(key)) ||
-                            (!dict0.ContainsKey(key) && dict1.ContainsKey(key) && !dict2.ContainsKey(key)) ||
-                            (!dict0.ContainsKey(key) && !dict1.ContainsKey(key) && dict2.ContainsKey(key)))
+                        var (index, entry) = entryGroup;
+                        if (entryGroups.Count == 1)
                         {
-                            entry.MessageKey += " (NEW)";
+                            entry.MessageKey += index == 0 ? " (NEW)" : " (OLD)";
                         }
                         else
                         {
-                            entry.MessageKey += " (MODIFIED)";
+                            var isModified = entryGroups.Select(e => e.entry.DefaultString).Distinct().Count() > 1;
+                            if (isModified)
+                            {
+                                entry.MessageKey += index == dictionaries.Count - 1 ? " (MODIFIED) (New)" : " (MODIFIED) (Old)";
+                            }
                         }
                     }
-
-                    resultDict.Add(key, differentEntries.ToList());
+                    resultDict[key] = differentEntries.Select(de => de.entry).ToList();
+                }
+                else
+                {
+                    if (entryGroups.Count < dictionaries.Count)
+                    {
+                        foreach (var entryGroup in entryGroups)
+                        {
+                            var (index, entry) = entryGroup;
+                            if (index < dictionaries.Count - 1)
+                            {
+                                entry.MessageKey += " (REMOVED)";
+                                if (!resultDict.ContainsKey(key))
+                                {
+                                    resultDict[key] = new List<MessageEntry>();
+                                }
+                                resultDict[key].Add(entry);
+                            }
+                        }
+                    }
                 }
             }
 
