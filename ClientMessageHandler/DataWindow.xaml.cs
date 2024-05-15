@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using ClientMessageHandler.API;
-using ClientMessageHandler.Entry;
+using ClientMessageHandler.Generic;
 using TextBox = HandyControl.Controls.TextBox;
 using Window = System.Windows.Window;
 
@@ -18,7 +17,7 @@ namespace ClientMessageHandler
     {
         private static DataWindow instance;
         
-        private ObservableCollection<string> fileListItems { get; set; }
+        private ObservableCollection<string> fileListItems { get; set; } = new ObservableCollection<string>();
         
         private List<string> allFileNames;
         
@@ -40,7 +39,6 @@ namespace ClientMessageHandler
         public DataWindow()
         {
             InitializeComponent();
-            fileListItems = new ObservableCollection<string>();
             fileList.ItemsSource = fileListItems;
         }
 
@@ -50,12 +48,12 @@ namespace ClientMessageHandler
             
             DateTime startLoad = DateTime.Now;
 
-            if (API.API.FileMessagesDict != null)
+            if (API.FileMessagesDict != null)
             {
-                allFileNames = API.API.FileMessagesDict.Keys.ToList();
+                allFileNames = API.FileMessagesDict.Keys.ToList();
                 
                 ProgressWindow.Instance.progressBar.Maximum = allFileNames.Count;
-                await LoadNextBatchAsync(ProgressWindow.Instance);
+                await LoadFilesInBatchesAsync(ProgressWindow.Instance);
                 
                 Show();
                 
@@ -65,76 +63,133 @@ namespace ClientMessageHandler
             }
             else
             {
-                Logger.Error("ERROR! FileMessageDict is null or empty !");
+                Logger.Error("ERROR! FileMessageDict is null or empty!");
             }
         }
 
-        private async Task LoadNextBatchAsync(ProgressWindow progressWindow)
+        private async Task LoadFilesInBatchesAsync(ProgressWindow progressWindow)
         {
-            int startIndex = fileListItems.Count;
-            int endIndex = startIndex + batchSize;
-            if (endIndex > allFileNames.Count)
+            for (int i = 0; i < allFileNames.Count; i += batchSize)
             {
-                endIndex = allFileNames.Count;
+                var batch = allFileNames.Skip(i).Take(batchSize).ToList();
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    foreach (var fileName in batch)
+                    {
+                        fileListItems.Add(fileName);
+                        progressWindow.UpdateProgress(fileListItems.Count);
+                    }
+                });
+
+                await Task.Delay(1);
             }
 
-            for (int i = startIndex; i < endIndex; i++)
-            {
-                fileListItems.Add(allFileNames[i]);
-                progressWindow.UpdateProgress(i + 1);
-            }
-
-            if (endIndex < allFileNames.Count)
-            {
-                await Task.Delay(50);
-                await LoadNextBatchAsync(progressWindow);
-            }
-            else
-            {
-                progressWindow.Hide();
-            }
+            progressWindow.Hide();
         }
-        
+
         protected override void OnClosing(CancelEventArgs ev)
         {
             ev.Cancel = true;
-            this.Hide();
+            Hide();
         }
         
-        private void FileList_SelectionChanged(object sender, RoutedEventArgs e)
+        private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            messagePanel.Children.Clear();
-
-            if (fileList.SelectedItem is string selectedFile && API.API.FileMessagesDict.TryGetValue(selectedFile, out var messages))
+            try
             {
-                foreach (var message in messages)
+                messagePanel.Children.Clear();
+
+                if (fileList.SelectedItem is string selectedFile &&
+                    API.FileMessagesDict.TryGetValue(selectedFile, out var messages))
                 {
-                    var messageTextBox = new TextBox
+                    foreach (var message in messages)
                     {
-                        Text = $"MessageKey: {message.MessageKey}",
-                        IsReadOnly = true,
-                        BorderThickness = new Thickness(0),
-                        Margin = new Thickness(0, 0, 0, 5),
-                        FontWeight = FontWeights.Bold,
-                        Background = Brushes.Transparent,
-                        TextWrapping = TextWrapping.Wrap,
-                        FontSize = 15,
-                    };
+                        var horizontalPanel = new StackPanel
+                            { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 10) };
 
-                    var defaultStringTextBox = new TextBox
-                    {
-                        Text = $"DefaultString: {message.DefaultString}",
-                        IsReadOnly = true,
-                        BorderThickness = new Thickness(0),
-                        Background = Brushes.Transparent,
-                        TextWrapping = TextWrapping.Wrap,
-                        FontSize = 15,
-                    };
+                        var messageTextBox = CreateTextBox($"MessageKey: {message.MessageKey}", FontWeights.Bold);
+                        var defaultStringTextBox = CreateTextBox($"DefaultString: {message.DefaultString}");
 
-                    messagePanel.Children.Add(messageTextBox);
-                    messagePanel.Children.Add(defaultStringTextBox);
+                        var button = new Button
+                        {
+                            Content = "Toggle Details",
+                            Margin = new Thickness(5)
+                        };
+
+                        var webBrowser = new WebBrowser
+                        {
+                            Visibility = Visibility.Collapsed
+                        };
+
+                        button.Click += (s, args) =>
+                        {
+                            if (webBrowser.Visibility == Visibility.Collapsed)
+                            {
+                                string htmlContent = $@"
+                            <html>
+                            <body>
+                            <p><strong>MessageKey:</strong> {message.MessageKey}</p>
+                            <p><strong>DefaultString:</strong> {message.DefaultString}</p>
+                            </body>
+                            </html>";
+
+                                webBrowser.NavigateToString(htmlContent);
+                                webBrowser.Visibility = Visibility.Visible;
+                            }
+                            else
+                            {
+                                webBrowser.Visibility = Visibility.Collapsed;
+                            }
+                        };
+
+                        horizontalPanel.Children.Add(messageTextBox);
+                        horizontalPanel.Children.Add(button);
+
+                        var verticalPanel = new StackPanel { Orientation = Orientation.Vertical };
+                        verticalPanel.Children.Add(horizontalPanel);
+                        verticalPanel.Children.Add(defaultStringTextBox);
+                        verticalPanel.Children.Add(webBrowser);
+
+                        messagePanel.Children.Add(verticalPanel);
+
+                        webBrowser.Width = double.NaN;
+                        webBrowser.LoadCompleted += (s, e) =>
+                        {
+                            dynamic doc = webBrowser.Document;
+                            if (doc != null && doc!.body != null)
+                            {
+                                webBrowser.Height = double.NaN;
+                                webBrowser.Height = doc!.body.scrollHeight;
+                                
+                                string script = "document.body.style.overflow ='hidden'";
+                                webBrowser.InvokeScript("execScript", new Object[] { script, "JavaScript" });
+                            }
+                        };
+                        webBrowser.SetValue(Grid.RowSpanProperty, 2);
+                        webBrowser.SetValue(Grid.ColumnSpanProperty, 2);
+                    }
                 }
             }
+            catch (Exception exception)
+            {
+                Logger.Error(exception.Message + exception.StackTrace);
+            }
+        }
+
+        private TextBox CreateTextBox(string text, FontWeight fontWeight = default)
+        {
+            return new TextBox
+            {
+                Text = text,
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(0, 0, 0, 5),
+                FontWeight = fontWeight == default ? FontWeights.Normal : fontWeight,
+                Background = Brushes.Transparent,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 15,
+            };
         }
         
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -142,10 +197,15 @@ namespace ClientMessageHandler
             if (!string.Equals(searchTextBox.Text, "Search...", StringComparison.OrdinalIgnoreCase))
             {
                 string searchText = searchTextBox.Text.ToLower();
-        
-                var filteredFiles = allFileNames.Where(fileName => fileName.ToLower().Contains(searchText)).ToList();
-                filteredFiles.AddRange(allFileNames.Where(fileName => API.API.FileMessagesDict[fileName].Any(message => message.MessageKey.ToLower().Contains(searchText) || message.DefaultString.ToLower().Contains(searchText))));
-        
+
+                var filteredFiles = allFileNames
+                    .Where(fileName => fileName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    .Concat(allFileNames.Where(fileName => API.FileMessagesDict[fileName]
+                        .Any(message => message.MessageKey.Contains(searchText, StringComparison.OrdinalIgnoreCase) 
+                                     || message.DefaultString.Contains(searchText, StringComparison.OrdinalIgnoreCase))))
+                    .Distinct()
+                    .ToList();
+
                 UpdateFileList(filteredFiles);
             }
         }

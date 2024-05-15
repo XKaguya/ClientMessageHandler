@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 
-namespace ClientMessageHandler.API
+namespace ClientMessageHandler.Generic
 {
     public class Logger
     {
@@ -11,7 +11,7 @@ namespace ClientMessageHandler.API
 
         private static int MAX_LOG_COUNT { get; set; } = 180;
 
-        public static string LogLevel { get; set; } = "Info";
+        public static string LogLevel { get; set; } = "Debug";
 
         static Logger()
         {
@@ -20,11 +20,7 @@ namespace ClientMessageHandler.API
 
         public static void SetLogLevel(string level)
         {
-            if (level == "Debug" || level == "DEBUG")
-            {
-                LogLevel = level;
-            }
-            else if (level == "Info" || level == "INFO")
+            if (level == "Debug" || level == "DEBUG" || level == "Info" || level == "INFO")
             {
                 LogLevel = level;
             }
@@ -42,7 +38,14 @@ namespace ClientMessageHandler.API
         
         public static void SetLogBackgroundColor(SolidColorBrush color)
         {
-            logRichTextBox.Background = color;
+            if (logRichTextBox.Dispatcher.CheckAccess())
+            {
+                logRichTextBox.Background = color;
+            }
+            else
+            {
+                logRichTextBox.Dispatcher.Invoke(() => logRichTextBox.Background = color);
+            }
         }
 
         public static void Log(string message)
@@ -58,7 +61,6 @@ namespace ClientMessageHandler.API
                 LogAddLine(logMessage, Brushes.CornflowerBlue);
             }
         }
-
 
         public static void Error(string message)
         {
@@ -83,15 +85,37 @@ namespace ClientMessageHandler.API
 
         private static void LogAddLine(string message, SolidColorBrush color)
         {
-            Paragraph paragraph = new Paragraph(new Run(message));
-            paragraph.Foreground = color;
+            if (logRichTextBox.Dispatcher.CheckAccess())
+            {
+                AppendLogMessage(message, color);
+            }
+            else
+            {
+                logRichTextBox.Dispatcher.Invoke(() => AppendLogMessage(message, color));
+            }
+        }
+
+        private static void AppendLogMessage(string message, SolidColorBrush color)
+        {
+            Paragraph paragraph = new Paragraph(new Run(message))
+            {
+                Foreground = color
+            };
 
             logRichTextBox.Document.Blocks.Add(paragraph);
+            logRichTextBox.ScrollToEnd();
         }
-        
+
         public static void ClearLog()
         {
-            logRichTextBox.Document.Blocks.Clear();
+            if (logRichTextBox.Dispatcher.CheckAccess())
+            {
+                logRichTextBox.Document.Blocks.Clear();
+            }
+            else
+            {
+                logRichTextBox.Dispatcher.Invoke(() => logRichTextBox.Document.Blocks.Clear());
+            }
         }
     }
 }

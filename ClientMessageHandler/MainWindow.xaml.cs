@@ -1,6 +1,8 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
+using System.IO;
 using System.Windows;
-using ClientMessageHandler.API;
+using ClientMessageHandler.Generic;
 
 namespace ClientMessageHandler
 {
@@ -50,7 +52,19 @@ namespace ClientMessageHandler
         
         private async void FileButtonHandler(object sender, RoutedEventArgs ev)
         {
-            API.API.LoadXmlFile();
+            try
+            {
+                string? path = Generic.API.LoadXmlFile()!;
+                if (!File.Exists(path))
+                {
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message + e.StackTrace);
+                throw;
+            }
 
             await DataWindow.Instance.PopulateFileListAsync();
         }

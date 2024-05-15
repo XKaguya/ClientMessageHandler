@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using ClientMessageHandler.API;
+using ClientMessageHandler.Generic;
 
 namespace ClientMessageHandler
 {

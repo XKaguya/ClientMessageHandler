@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows;
-using ClientMessageHandler.API;
+using ClientMessageHandler.Generic;
 
 namespace ClientMessageHandler;
 
@@ -39,7 +39,7 @@ public partial class Compare : Window
     {
         Logger.Log($"Selecting Original File...");
 
-        var temp = API.API.LoadXmlFileAlter();
+        var temp = API.LoadXmlFileAlter();
         if (temp != null && !filePaths.Contains(temp))
         {
             Content1.Text = temp;
@@ -52,7 +52,7 @@ public partial class Compare : Window
     {
         Logger.Log($"Selecting File2...");
 
-        var temp = API.API.LoadXmlFileAlter();
+        var temp = API.LoadXmlFileAlter();
         if (temp != null && !filePaths.Contains(temp))
         {
             Content2.Text = temp;
@@ -65,7 +65,7 @@ public partial class Compare : Window
     {
         Logger.Log($"Selecting File2...");
 
-        var temp = API.API.LoadXmlFileAlter();
+        var temp = API.LoadXmlFileAlter();
         if (temp != null && !filePaths.Contains(temp))
         {
             Content3.Text = temp;
@@ -78,8 +78,10 @@ public partial class Compare : Window
     {
         Logger.Log($"CallDif executed.");
         
-        await API.API.GetDifferenceAsync(filePaths);
-
+        API.FileMessagesDict.Clear();
+        
+        await API.GetDifferenceAsync(filePaths);
+        
         await DataWindow.Instance.PopulateFileListAsync();
         
         filePaths.Clear();
